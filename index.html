@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>寻乐 · 音乐检索平台</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --bg:#f5f6f8; --card:#ffffff; --line:#e3e6ea; --text:#1f2430; --muted:#7a8194;
+  --accent:#3d6df2; --accent-dark:#2b53c9; --accent-soft:#e8eeff; --ok:#12a36d; --warn:#d97706; --err:#dc2626;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,"Segoe UI","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+.wrap{max-width:1080px;margin:0 auto;padding:24px 20px 80px}
+header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+header h1{font-size:22px;font-weight:600}
+header .sub{font-size:13px;color:var(--muted)}
+.spacer{flex:1}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:8px;padding:8px 14px;font-size:14px;cursor:pointer;transition:all .15s}
+.btn:hover{border-color:var(--accent);color:var(--accent)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-dark)}
+.btn.danger:hover{border-color:var(--err);color:var(--err)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px;margin-bottom:16px}
+.card h2{font-size:16px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h2 .step{display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-size:13px;align-items:center;justify-content:center;font-weight:600}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:36px;text-align:center;color:var(--muted);cursor:pointer;transition:all .2s}
+.drop:hover,.drop.drag{border-color:var(--accent);background:var(--accent-soft);color:var(--accent)}
+.drop input{display:none}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+input[type=text],select,textarea{font:inherit;color:inherit;border:1px solid var(--line);border-radius:8px;padding:8px 12px;background:#fff;outline:none}
+input[type=text]:focus,textarea:focus{border-color:var(--accent)}
+textarea{width:100%;min-height:70px;resize:vertical}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}
+th{color:var(--muted);font-weight:500;white-space:nowrap;background:#fafbfc}
+td[contenteditable]{outline:none;cursor:text}
+td[contenteditable]:focus{background:var(--accent-soft)}
+.tbl-scroll{overflow:auto;max-height:420px;border:1px solid var(--line);border-radius:8px}
+.tag{display:inline-block;background:var(--accent-soft);color:var(--accent);border-radius:6px;padding:2px 8px;font-size:12px;margin:2px 3px 2px 0;white-space:nowrap}
+.listen a{display:inline-block;margin:2px 4px 2px 0;padding:3px 9px;border-radius:6px;font-size:12px;text-decoration:none;border:1px solid var(--line);color:var(--text);transition:all .15s}
+.listen a:hover{border-color:var(--accent);color:var(--accent)}
+.play-btn{display:inline-flex;align-items:center;gap:3px;margin:2px 6px 2px 0;padding:3px 10px;border-radius:6px;font-size:12px;cursor:pointer;border:1px solid var(--accent);background:var(--accent);color:#fff;font-family:inherit;transition:all .15s}
+.play-btn:hover{background:var(--accent-dark);border-color:var(--accent-dark)}
+.play-btn:disabled{opacity:.5;cursor:not-allowed}
+.play-btn.pending{opacity:.45;cursor:progress}
+.play-btn.na{background:transparent;border-color:var(--line);color:var(--muted);opacity:.55;cursor:not-allowed;text-decoration:line-through}
+.play-btn.na:hover{background:transparent;border-color:var(--line)}
+.playbar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);box-shadow:0 -4px 18px rgba(20,24,36,.12);padding:10px 16px;display:none;z-index:60;align-items:center;gap:12px}
+.playbar.show{display:flex}
+.playbar .cover{width:46px;height:46px;border-radius:8px;object-fit:cover;background:#eef0f4;flex:none}
+.playbar .meta{min-width:150px;max-width:220px;flex:0 1 auto}
+.playbar .meta .n{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.playbar .meta .s{font-size:12px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.playbar .meta .s a{color:var(--accent);text-decoration:none}
+.playbar audio{flex:1 1 320px;min-width:180px;max-width:520px;height:38px;display:none}
+.playbar iframe{border:0;height:66px;flex:1 1 300px;min-width:260px;display:none}
+.playbar .tip{font-size:12px;color:var(--warn);max-width:300px;line-height:1.5}
+.playbar .set-audio{border:0;background:transparent;color:var(--accent);font-size:12px;cursor:pointer;padding:0;font-family:inherit;text-decoration:underline}
+.playbar .close{border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:6px;padding:6px 11px;cursor:pointer;font-size:12px;font-family:inherit;flex:none}
+.playbar .close:hover{border-color:var(--err);color:var(--err)}
+@media(max-width:700px){.playbar{flex-wrap:wrap}.playbar .meta{max-width:100%}.playbar audio,.playbar iframe{max-width:100%}}
+.progress{height:8px;background:#eef0f4;border-radius:6px;overflow:hidden;margin-top:10px}
+.progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .3s}
+.progress-txt{font-size:12px;color:var(--muted);margin-top:6px}
+.result-card{border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:12px}
+.result-card .top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.result-card .rank{font-size:15px;font-weight:700;color:var(--accent)}
+.result-card .t{font-size:15px;font-weight:600}
+.result-card .a{font-size:13px;color:var(--muted)}
+.result-card .reason{font-size:13px;color:var(--text);margin-top:6px;line-height:1.6}
+.result-card .reason b{color:var(--accent)}
+.empty{color:var(--muted);text-align:center;padding:30px 0;font-size:14px}
+.hint{font-size:12px;color:var(--muted);line-height:1.7;margin-top:8px}
+.modal-mask{position:fixed;inset:0;background:rgba(20,24,36,.45);display:none;align-items:center;justify-content:center;z-index:50}
+.modal-mask.show{display:flex}
+.modal{background:#fff;border-radius:12px;width:min(520px,92vw);padding:24px}
+.modal h3{font-size:16px;margin-bottom:16px}
+.field{margin-bottom:14px}
+.field label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+.field input[type=text]{width:100%}
+.lib-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.lib-tab{position:relative;border:1px solid var(--line);background:#fff;border-radius:20px;padding:5px 14px;font-size:13px;cursor:pointer}
+.lib-tab.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.lib-x{display:inline-block;margin-left:6px;padding:0 5px;border-radius:50%;cursor:pointer;opacity:.6;font-weight:bold}
+.lib-x:hover{opacity:1;background:rgba(255,255,255,.25)}
+.search-scope{font-size:12px;color:var(--muted);margin:10px 0 0;padding:6px 12px;background:#f4f6fb;border-radius:6px;display:inline-block}
+.search-scope b{color:var(--accent)}
+.search-scope .empty-lib{color:var(--err)}
+.badge{font-size:11px;color:var(--ok);border:1px solid currentColor;border-radius:5px;padding:0 5px;margin-left:6px}
+.badge.no{color:var(--muted)}
+footer{color:var(--muted);font-size:12px;text-align:center;margin-top:30px}
+.status{font-size:12px;color:var(--muted)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1f2430;color:#fff;padding:10px 18px;border-radius:8px;font-size:14px;z-index:99;opacity:0;pointer-events:none;transition:opacity .25s}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>寻乐</h1>
+    <span class="sub">上传曲库 · AI 补全 · 场景找歌</span>
+    <div class="spacer"></div>
+    <button class="btn" onclick="openSettings()">接口设置</button>
+    <button class="btn" onclick="exportXlsx()">导出 Excel</button>
+  </header>
+
+  <div class="card">
+    <h2><span class="step">1</span>上传曲目表 <span class="status" id="libStatus"></span></h2>
+    <div class="drop" id="drop">
+      <div style="font-size:15px;margin-bottom:4px">点击选择或拖拽 Excel / CSV 文件</div>
+      <div style="font-size:12px">至少包含两列：曲目名称、歌手/演唱者（表头可为「曲名/歌名」「歌手/艺术家」等，程序自动识别）</div>
+      <input type="file" id="file" accept=".xlsx,.xls,.csv">
+    </div>
+    <div style="text-align:center;color:#9aa3b2;font-size:12px;margin:10px 0 8px">—— 或 ——</div>
+    <div class="row">
+      <input type="text" id="txUrl" placeholder="粘贴腾讯文档链接，如 https://docs.qq.com/sheet/XXXXXX" style="flex:1;min-width:260px">
+      <button class="btn" id="btnTx" onclick="syncTxDoc()">同步文档</button>
+    </div>
+    <div class="hint">腾讯文档需先设为「互联网上获得链接的人可阅读」才能读取；表格与文档都支持，表格效果最好（首行作表头）。</div>
+    <div class="row">
+      <input type="text" id="libName" placeholder="曲库名称（不填则用文件名）" style="flex:1;min-width:220px">
+      <button class="btn primary" onclick="loadSample()">载入示例数据（20 首·可直接搜索）</button>
+    </div>
+    <div class="lib-tabs" id="libTabs"></div>
+    <div class="hint">每个曲库独立保存于浏览器本地（不依赖飞书/服务器）。上传新文件到同名曲库会整体替换；搜索只会在当前选中的曲库内进行。</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">2</span>AI 补全字段 <span class="status" id="parseStatus"></span></h2>
+    <div class="row">
+      <select id="parseModel" style="flex:1;min-width:160px"></select>
+      <button class="btn primary" id="btnParse" onclick="startParse()">开始解析全部曲目</button>
+    </div>
+    <div class="progress" id="prog" style="display:none"><i id="progBar"></i></div>
+    <div class="progress-txt" id="progTxt"></div>
+    <div style="margin-top:12px">
+      <div class="tbl-scroll">
+        <table id="tbl">
+          <thead><tr>
+            <th>曲名</th><th>歌手</th><th>曲风</th><th>情绪</th><th>场景</th><th>主题</th><th>语种</th><th>年代</th><th>BPM</th><th>调性</th><th>能量</th><th>编制</th><th>主要乐器</th><th>歌手数量</th><th>歌手性别</th><th>音域</th><th>简介</th><th>试听</th>
+          </tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="hint">字段可直接在表格中点击修改。解析为批量进行（每批 20 首），可随时中止。</div>
+  </div>
+
+  <div class="card">
+    <h2><span class="step">3</span>场景找歌</h2>
+    <textarea id="scene" placeholder="描述你需要的场景，例如：&quot;清晨山间的公路旅行，轻快的吉他民谣，有阳光感和出发的兴奋，不要人声不要悲伤&quot;"></textarea>
+    <div class="row">
+      <span style="font-size:13px;color:var(--muted)">返回数量</span>
+      <select id="topN" style="width:80px">
+        <option value="3">3</option>
+        <option value="5" selected>5</option>
+        <option value="8">8</option>
+        <option value="10">10</option>
+      </select>
+      <select id="rankModel" style="flex:1;min-width:160px"></select>
+      <button class="btn primary" id="btnSearch" onclick="doSearch()">开始搜索</button>
+    </div>
+    <div id="searchScope" class="search-scope"></div>
+    <div id="results" style="margin-top:16px"></div>
+  </div>
+
+  <footer>寻乐 v0.3.1 · 支持 Excel 上传与腾讯文档链接同步 · 已内置 API，打开即用 · 播放键自动预检，版权受限的已置灰 · 曲库仅存于本地浏览器</footer>
+</div>
+
+<div class="modal-mask" id="mask">
+  <div class="modal">
+    <h3>接口设置</h3>
+    <div class="field"><label>API Base URL（默认火山方舟，兼容 OpenAI 格式）</label><input type="text" id="cfgBase" placeholder="https://ark.cn-beijing.volces.com/api/v3/chat/completions"></div>
+    <div class="field"><label>API Key（已内置，留空即用内置 Key；也可填自己的覆盖）</label><input type="text" id="cfgKey" placeholder="已内置默认 Key，留空即可直接使用"></div>
+    <div class="field"><label>补全字段用的模型（填方舟真实模型 ID 或推理接入点 ep-xxx）</label><input type="text" id="cfgParseModel" placeholder="doubao-seed-evolving"></div>
+    <div class="field"><label>场景搜索用的模型（填方舟真实模型 ID 或推理接入点 ep-xxx）</label><input type="text" id="cfgRankModel" placeholder="doubao-seed-evolving"></div>
+    <div class="field"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="cfgThinking" style="width:auto;flex:none"> 启用模型深度思考（慢约 20 倍，一般不需要）</label></div>
+    <div class="row" style="justify-content:flex-end">
+      <button class="btn" onclick="closeSettings()">取消</button>
+      <button class="btn primary" onclick="saveSettings()">保存</button>
+    </div>
+    <div class="hint">已内置火山方舟 API Key 与 doubao-seed-evolving 模型，打开页面即可直接使用，无需任何配置。注意：内置 Key 会被访问该页面的人从网页源码中看到；如需分享给他人，请先到方舟后台为该 Key 设置额度上限，或让对方填写自己的 Key。</div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<div class="playbar" id="playbar">
+  <img class="cover" id="pbCover" alt="">
+  <div class="meta">
+    <div class="n" id="pbName">—</div>
+    <div class="s" id="pbSub">—</div>
+  </div>
+  <audio id="pbAudio" controls preload="none"></audio>
+  <iframe id="pbFrame" allow="autoplay; encrypted-media" title="music"></iframe>
+  <div class="tip" id="pbTip"></div>
+  <button class="close" id="pbClose">关闭</button>
+</div>
+
+<script>
+"use strict";
+const LS_LIBS="mf_libs_v1", LS_CUR="mf_cur_v1", LS_CFG="mf_cfg_v1";
+const FIELDS=["genre","mood","scene","theme","language","era","bpm","tonality","energy","arrangement","instrument","vocalCount","vocalGender","vocalRange","intro"];
+const FIELD_CN={genre:"曲风",mood:"情绪",scene:"场景",theme:"主题",language:"语种",era:"年代",bpm:"BPM",tonality:"调性",energy:"能量",arrangement:"编制",instrument:"主要乐器",vocalCount:"歌手数量",vocalGender:"歌手性别",vocalRange:"音域",intro:"简介"};
+const TITLE_KEYS=["曲名","歌名","歌曲","歌曲名称","名称","title","name","track"];
+const ARTIST_KEYS=["歌手","演唱者","艺术家","艺人","作者","artist","singer","author"];
+
+let libs={}, cur=null, parsing=false, abortParse=false, seq=0;
+
+function $id(x){return document.getElementById(x)}
+function toast(msg){const t=$id("toast");t.textContent=msg;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2600)}
+function esc(s){return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
+
+/* ---------- settings ---------- */
+const BUILTIN_KEY="47c9429d-d1ce-4fc5-8477-d183bc7c835c";
+const DEF_CFG={base:"https://ark.cn-beijing.volces.com/api/v3/chat/completions",key:BUILTIN_KEY,parseModel:"doubao-seed-2-0-mini-260428",rankModel:"doubao-seed-evolving",thinking:false};
+const LEGACY_MODELS=["deepseek-v4-flash","deepseek-v4-pro","doubao-2.1-pro","doubao-2.1-evolving","glm-5.2"];
+function loadCfg(){
+  let c;
+  try{c=Object.assign({},DEF_CFG,JSON.parse(localStorage.getItem(LS_CFG)||"{}"))}catch(e){c=Object.assign({},DEF_CFG)}
+  if(!c.key)c.key=DEF_CFG.key;
+  if(!c.base)c.base=DEF_CFG.base;
+  if(!c.parseModel)c.parseModel=DEF_CFG.parseModel;
+  if(!c.rankModel)c.rankModel=DEF_CFG.rankModel;
+  if(LEGACY_MODELS.includes(c.parseModel))c.parseModel=DEF_CFG.parseModel;
+  if(LEGACY_MODELS.includes(c.rankModel))c.rankModel=DEF_CFG.rankModel;
+  return c;
+}
+function saveCfg(){localStorage.setItem(LS_CFG,JSON.stringify(cfg))}
+let cfg=loadCfg();
+function openSettings(){$id("cfgBase").value=cfg.base;$id("cfgKey").value=cfg.key===BUILTIN_KEY?"":cfg.key;$id("cfgParseModel").value=cfg.parseModel;$id("cfgRankModel").value=cfg.rankModel;$id("cfgThinking").checked=!!cfg.thinking;$id("mask").classList.add("show")}
+function closeSettings(){$id("mask").classList.remove("show")}
+function saveSettings(){cfg.base=$id("cfgBase").value.trim()||DEF_CFG.base;cfg.key=$id("cfgKey").value.trim()||DEF_CFG.key;cfg.parseModel=$id("cfgParseModel").value.trim()||DEF_CFG.parseModel;cfg.rankModel=$id("cfgRankModel").value.trim()||DEF_CFG.rankModel;cfg.thinking=$id("cfgThinking").checked;saveCfg();fillModelSelects();closeSettings();toast("设置已保存")}
+
+/* ---------- models / api ---------- */
+function fillModelSelects(){
+  const pm=cfg.parseModel,rm=cfg.rankModel;
+  const opts=[["doubao-seed-evolving","Doubao-Seed-Evolving（质量优先 · 场景精排推荐）"],["doubao-seed-2-0-mini-260428","Doubao-Seed-2.0-Mini（速度优先 · 批量解析推荐）"]];
+  if(!opts.some(o=>o[0]===pm))opts.push([pm,pm+"（自定义）"]);
+  if(!opts.some(o=>o[0]===rm))opts.push([rm,rm+"（自定义）"]);
+  let h1="",h2="";
+  for(const [v,l] of opts){h1+=`<option value="${v}" ${v===pm?"selected":""}>${l}</option>`;h2+=`<option value="${v}" ${v===rm?"selected":""}>${l}</option>`}
+  $id("parseModel").innerHTML=h1;$id("rankModel").innerHTML=h2;
+}
+async function chat(messages,model,temp=0.3){
+  if(!cfg.key){toast("请先在「接口设置」中填入 API Key");throw new Error("no key")}
+  const body={model,messages,temperature:temp,stream:false};
+  if(!cfg.thinking)body.thinking={type:"disabled"};
+  const res=await fetch(cfg.base,{method:"POST",headers:{"Content-Type":"application/json","Authorization":"Bearer "+cfg.key},body:JSON.stringify(body)});
+  if(!res.ok){let t="";try{t=(await res.json()).error?.message||""}catch(e){}throw new Error("HTTP "+res.status+(t?" "+t:""))}
+  const j=await res.json();
+  return j.choices?.[0]?.message?.content||"";
+}
+function parseJSON(s){
+  s=s.trim().replace(/^```(?:json)?\s*/i,"").replace(/```\s*$/,"").trim();
+  try{return JSON.parse(s)}catch(e){
+    const a=s.indexOf("["),b=s.lastIndexOf("]");
+    if(a>=0&&b>a){try{return JSON.parse(s.slice(a,b+1))}catch(e2){}}
+    const o=s.indexOf("{"),c=s.lastIndexOf("}");
+    if(o>=0&&c>o){try{return JSON.parse(s.slice(o,c+1))}catch(e3){}}
+    throw new Error("模型返回无法解析为 JSON");
+  }
+}
+
+/* ---------- library persistence ---------- */
+function saveLibs(){try{localStorage.setItem(LS_LIBS,JSON.stringify(libs))}catch(e){toast("本地存储已满，请精简曲库")}}
+function loadLibs(){try{libs=JSON.parse(localStorage.getItem(LS_LIBS)||"{}")}catch(e){libs={}}
+  if(Object.keys(libs).length===0)libs={};
+  cur=localStorage.getItem(LS_CUR);
+  if(!libs[cur])cur=Object.keys(libs)[0]||null;
+}
+function renderTabs(){
+  const names=Object.keys(libs);
+  let h="";
+  if(names.length===0){h=`<div class="lib-tab" style="border-style:dashed;cursor:default">暂无曲库，请先上传</div>`}
+  for(const n of names){
+    const cnt=libs[n].tracks.length, done=libs[n].tracks.filter(t=>t.enriched).length;
+    h+=`<span class="lib-tab ${n===cur?"on":""}" onclick="switchLib('${esc(n).replace(/'/g,"\\'")}')">${esc(n)} <span style="font-size:11px;opacity:.75">${cnt}首${done?`/已解析${done}`:""}</span><span class="lib-x" onclick="event.stopPropagation();delLib('${esc(n).replace(/'/g,"\\'")}')" title="删除此库">×</span></span>`;
+  }
+  if(cur&&libs[cur]&&libs[cur].src){
+    h+=`<span class="lib-tab" data-resync style="border-style:dashed" onclick="resyncCur()" title="源：${esc(libs[cur].src)}">↻ 重新同步</span>`;
+  }
+  $id("libTabs").innerHTML=h;
+  const st=cur?`当前曲库：${esc(cur)}（${libs[cur].tracks.length} 首，已解析 ${libs[cur].tracks.filter(t=>t.enriched).length} 首）`:"请先上传曲目表";
+  $id("libStatus").textContent=st;
+  renderScope();
+  renderTable();
+}
+function renderScope(){
+  const el=$id("searchScope");
+  if(!el)return;
+  if(!cur){el.innerHTML=`<span class="empty-lib">⚠ 当前没有曲库可搜，请先上传或载入示例数据</span>`;return}
+  const tracks=libs[cur].tracks.filter(t=>t.title);
+  const ok=tracks.filter(t=>t.enriched).length;
+  const total=tracks.length;
+  const libCnt=Object.keys(libs).length;
+  el.innerHTML=`🔍 搜索范围：<b>${esc(cur)}</b> · 共 <b>${total}</b> 首（已解析 ${ok} 首）${libCnt>1?` · 你的浏览器里还有 ${libCnt} 个曲库（可点击上方标签切换或 × 删除）`:""}`;
+}
+function switchLib(n){cur=n;localStorage.setItem(LS_CUR,n);renderTabs()}
+function delLib(n){
+  if(!confirm(`确定删除曲库「${n}」？此操作仅影响浏览器本地，不会上传。`))return;
+  delete libs[n];
+  if(cur===n){
+    cur=Object.keys(libs)[0]||null;
+    if(cur)localStorage.setItem(LS_CUR,cur);else localStorage.removeItem(LS_CUR);
+  }
+  saveLibs();renderTabs();toast(`已删除「${n}」`);
+}
+
+/* ---------- upload & parse xlsx ---------- */
+function detectColumns(headers){
+  let ti=-1,ai=-1;
+  headers.forEach((h,i)=>{
+    const s=String(h||"").toLowerCase().trim();
+    if(ti<0&&TITLE_KEYS.includes(s))ti=i;
+    if(ai<0&&ARTIST_KEYS.includes(s))ai=i;
+  });
+  return {ti,ai};
+}
+function handleFile(file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(new Uint8Array(e.target.result),{type:"array"});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:""});
+      if(rows.length<2){toast("表格为空或只有表头");return}
+      const headers=rows[0].map(h=>String(h).trim());
+      let {ti,ai}=detectColumns(headers);
+      if(ti<0){ti=0;toast("未识别曲名列，默认取第一列")}
+      if(ai<0){ai=ti===0?1:0;toast("未识别歌手列，默认取相邻列")}
+      const tracks=rows.slice(1).filter(r=>String(r[ti]||"").trim()).map(r=>({
+        title:String(r[ti]).trim(),artist:String(r[ai]||"").trim(),
+        genre:"",mood:"",scene:"",theme:"",language:"",era:"",bpm:"",tonality:"",energy:"",arrangement:"",instrument:"",vocalCount:"",vocalGender:"",vocalRange:"",intro:"",enriched:false
+      }));
+      if(tracks.length===0){toast("没有有效数据");return}
+      const name=($id("libName").value.trim()||file.name.replace(/\.[^.]+$/,""))+"";
+      libs[name]={tracks,createdAt:Date.now()};
+      cur=name;localStorage.setItem(LS_CUR,name);
+      saveLibs();$id("libName").value="";renderTabs();
+      toast(`已载入 ${tracks.length} 首曲目到「${name}」`);
+    }catch(err){toast("解析失败："+err.message)}
+  };
+  reader.readAsArrayBuffer(file);
+}
+/* ===== 腾讯文档同步 ===== */
+function newTrack(title,artist){return {title:String(title||"").trim(),artist:String(artist||"").trim(),genre:"",mood:"",scene:"",theme:"",language:"",era:"",bpm:"",tonality:"",energy:"",arrangement:"",instrument:"",vocalCount:"",vocalGender:"",vocalRange:"",intro:"",enriched:false}}
+// 让模型判断表格列结构（只送前 80 格样本，省 token）
+async function inferCols(cells){
+  const sample=cells.slice(0,Math.min(80,cells.length));
+  const prompt=`下面是从腾讯文档表格中按「行优先」顺序提取的单元格文本（先第一行各列，再第二行各列，依次类推）。
+请判断表格结构，只返回 JSON，不要任何其他文字：
+{"cols":每行的列数,"titleCol":曲名列序号(从0开始),"artistCol":歌手/演唱者列序号(从0开始),"headerRows":表头占几行}
+若看不出结构，返回 {"cols":0}。
+单元格：${JSON.stringify(sample)}`;
+  try{
+    const content=await chat([{role:"user",content:prompt}],cfg.parseModel,0);
+    const txt=parseJSON(content)||content;
+    const o=JSON.parse(txt);
+    return (o&&typeof o==="object")?o:{cols:0};
+  }catch(e){return {cols:0}}
+}
+// 让模型直接从文本池抽取曲目（分批处理长表格）
+// 注意：文本池只含文本单元格，空单元格/纯数字单元格不占位，所以不能简单按固定列数切分
+async function extractTracksByLLM(cells){
+  const BATCH=120,HEAD=["曲名","歌名","歌曲","歌曲名称","名称","歌手","演唱者","艺术家","艺人","作者","序号","编号","备注","title","name","artist"];
+  const out=[];
+  for(let i=0;i<cells.length;i+=BATCH){
+    const chunk=cells.slice(i,i+BATCH);
+    const prompt=`下面是从腾讯文档表格中提取出的单元格文本，按表格从左到右、从上到下的顺序排列。
+注意：空单元格和纯数字单元格不会出现在其中，所以不能按固定列数去切分，请按语义识别。
+请找出其中所有曲目，每首给出「曲名」和「歌手/演唱者」：
+- 表头（如"曲名""歌手""序号"）不要当作曲目
+- 歌手缺失时 artist 填空字符串
+- 无法判断是否为曲目的文本请跳过，不要编造
+只返回 JSON 数组，不要任何其他文字：[{"title":"曲名","artist":"歌手"},...]
+单元格：${JSON.stringify(chunk)}`;
+    try{
+      const content=await chat([{role:"user",content:prompt}],cfg.parseModel,0);
+      const txt=parseJSON(content)||content;
+      const arr=JSON.parse(txt);
+      if(Array.isArray(arr)){
+        arr.forEach(x=>{
+          if(!x||!x.title)return;
+          const t=String(x.title).trim();
+          if(!t||HEAD.includes(t.toLowerCase()))return;
+          out.push(newTrack(t,x.artist));
+        });
+      }
+    }catch(e){/* 本批失败则跳过，靠兜底 */}
+  }
+  return out;
+}
+// 兜底：模型判断列结构后按列切分
+async function splitByCols(cells){
+  const sch=await inferCols(cells);
+  const cols=sch.cols>0?sch.cols:2;
+  const start=(Number(sch.headerRows)||1)*cols;
+  const ti=(sch.titleCol>=0?sch.titleCol:0);
+  const ai=(sch.artistCol>=0?sch.artistCol:(cols>1?1:0));
+  const tracks=[];
+  for(let i=start;i<cells.length;i+=cols){
+    const row=cells.slice(i,i+cols);
+    if(String(row[ti]||"").trim())tracks.push(newTrack(row[ti],row[ai]));
+  }
+  return {tracks,note:`（按每行 ${cols} 列切分）`};
+}
+// 主入口：文本池 -> 曲目列表
+async function parseCellsToTracks(cells,padType){
+  if(padType==="doc"){
+    const tracks=cells.map(line=>{
+      const seg=line.split(/\s+[-–—]\s+|\t|\s{2,}/);
+      return seg.length>=2?newTrack(seg[0],seg[1]):newTrack(line,"");
+    }).filter(t=>t.title);
+    return {tracks,note:"（按每行一首解析）"};
+  }
+  // 表格：优先让模型端到端抽取，不受空单元格/数字单元格影响
+  const tracks=await extractTracksByLLM(cells);
+  if(tracks.length>0)return {tracks,note:`（AI 识别出 ${tracks.length} 首）`};
+  // 兜底：按列切分
+  return await splitByCols(cells);
+}
+async function syncTxDoc(){
+  const url=$id("txUrl").value.trim();
+  if(!url){toast("请先粘贴腾讯文档链接");return}
+  if(!/docs\.qq\.com\//i.test(url)){toast("请粘贴 docs.qq.com 开头的腾讯文档链接");return}
+  if(location.protocol==="file:"){
+    toast("本地文件方式打开时无法读取腾讯文档，请通过在线链接访问本页面");
+    return;
+  }
+  const btn=$id("btnTx");const old=btn.textContent;
+  btn.disabled=true;btn.textContent="读取中…";
+  try{
+    const res=await fetch("/api/txdoc?url="+encodeURIComponent(url));
+    const data=await res.json();
+    if(!data.ok){toast(data.error||"读取失败");return}
+    const cells=data.cells||[];
+    if(cells.length===0){toast("文档内容为空");return}
+    const {tracks,note}=await parseCellsToTracks(cells,data.padType);
+    if(tracks.length===0){toast("没能解析出曲目，请检查文档内容");return}
+    const name=$id("libName").value.trim()||(data.title||"腾讯文档曲库");
+    libs[name]={tracks,createdAt:Date.now(),src:url,srcTitle:data.title||""};
+    cur=name;localStorage.setItem(LS_CUR,name);
+    saveLibs();$id("libName").value="";renderTabs();
+    toast(`已从「${data.title||name}」载入 ${tracks.length} 首${note}`);
+  }catch(err){
+    toast("同步失败："+(err&&err.message?err.message:"无法连接读取服务，请确认通过在线链接访问"));
+  }finally{
+    btn.disabled=false;btn.textContent=old;
+  }
+}
+// 重新同步当前曲库（仅限腾讯文档来源），保留已 AI 解析的字段
+async function resyncCur(){
+  if(!cur||!libs[cur]||!libs[cur].src){toast("当前曲库不是从腾讯文档同步来的");return}
+  const name=cur,src=libs[cur].src;
+  const btn=document.querySelector("[data-resync]");
+  if(btn){btn.style.opacity=.5;btn.textContent="同步中…"}
+  try{
+    const res=await fetch("/api/txdoc?url="+encodeURIComponent(src));
+    const data=await res.json();
+    if(!data.ok){toast(data.error||"读取失败");return}
+    const {tracks,note}=await parseCellsToTracks(data.cells||[],data.padType);
+    if(tracks.length===0){toast("没能解析出曲目，请检查文档内容");return}
+    // 按「曲名|歌手」保留已解析字段，避免重复花费
+    const oldMap={};
+    (libs[name].tracks||[]).forEach(t=>{if(t.enriched)oldMap[t.title+"|"+t.artist]=t});
+    let kept=0;
+    tracks.forEach(t=>{
+      const o=oldMap[t.title+"|"+t.artist];
+      if(o){for(const f of FIELDS)t[f]=o[f];t.enriched=true;kept++}
+    });
+    const before=libs[name].tracks.length;
+    libs[name].tracks=tracks;
+    libs[name].syncedAt=Date.now();
+    saveLibs();renderTabs();
+    toast(`已同步 ${before} → ${tracks.length} 首${note}${kept?"，复用 "+kept+" 首已解析字段":""}`);
+  }catch(err){
+    toast("同步失败："+(err&&err.message?err.message:"无法连接读取服务"));
+  }
+}
+function loadSample(){
+  const S=[
+  ["海阔天空","Beyond","流行摇滚,粤语流行","励志,热血,沧桑","公路旅行,毕业季,励志活动","梦想,奋斗,自由","粤语","1993","70-90","大调","4","人声+乐器","吉他,贝斯,鼓,钢琴","三人及以上","组合","高音","经典励志粤语摇滚金曲"],
+  ["晴天","周杰伦","流行,民谣","怀旧,青涩,遗憾","校园漫步,午后发呆,毕业聚会","青春,初恋,遗憾","中文","2003","60-80","大调","2","人声+乐器","吉他,钢琴,鼓,贝斯","单人","男","中音","青春校园怀旧流行金曲"],
+  ["小幸运","田馥甄","流行,抒情","温暖,治愈,青涩","校园漫步,情侣约会,告白时刻","爱情,青春,初恋","中文","2015","70-90","大调","2","人声+乐器","钢琴,吉他,弦乐,鼓","单人","女","高音","青春爱情治愈抒情金曲"],
+  ["平凡之路","朴树","民谣,摇滚","沧桑,自由,释然","公路旅行,人生回顾,独自远行","成长,自由,人生","中文","2014","80-100","大调","3","人声+乐器","吉他,鼓,贝斯,键盘","单人","男","中音","沧桑自由的公路民谣"],
+  ["成都","赵雷","民谣","温柔,怀旧,伤感","城市夜景,离别,独处","城市,离别,爱情","中文","2016","60-80","大调","2","人声+乐器","吉他,笛子,弦乐","单人","男","中音","温柔怀旧的城市民谣"],
+  ["起风了","买辣椒也用券","流行,民谣","励志,温暖,坚定","旅行出发,成长回顾,励志短片","成长,梦想,坚持","中文","2017","80-100","大调","3","人声+乐器","吉他,钢琴,鼓","单人","女","高音","励志温暖的成长民谣"],
+  ["孤勇者","陈奕迅","流行","热血,坚定,孤勇","战斗,高潮,逆袭","勇气,战斗,坚持","中文","2021","90-110","小调","4","人声+乐器","钢琴,弦乐,鼓,合成器","单人","男","中音","热血孤勇的战斗金曲"],
+  ["光年之外","G.E.M.邓紫棋","流行,电子","辽阔,深情,震撼","科幻,太空,高潮","爱情,宇宙,命运","中文","2016","90-110","小调","5","人声+乐器","合成器,鼓,钢琴,弦乐","单人","女","高音","辽阔震撼的科幻情歌"],
+  ["南山南","马頔","民谣","忧伤,思念,深情","深夜独处,失恋,回忆","爱情,离别,思念","中文","2014","60-80","小调","2","人声+乐器","吉他,钢琴,弦乐","单人","男","中音","忧伤深情的民谣情歌"],
+  ["斑马斑马","宋冬野","民谣","孤独,漂泊,沧桑","深夜独处,旅途,流浪","漂泊,孤独,爱情","中文","2012","60-80","小调","1","人声+乐器","吉他,手风琴,鼓","单人","男","低音","孤独漂泊的沧桑民谣"],
+  ["董小姐","宋冬野","民谣","温柔,遗憾,深情","深夜独处,回忆,安静","爱情,遗憾,成长","中文","2012","60-80","大调","2","人声+乐器","吉他,贝斯,鼓","单人","男","低音","温柔遗憾的民谣情歌"],
+  ["易燃易爆炸","陈粒","独立,摇滚","张扬,矛盾,炽烈","个性短片,舞蹈,高潮","爱情,自我,矛盾","中文","2015","100-120","小调","5","人声+乐器","吉他,鼓,贝斯,弦乐","单人","女","中音","张扬炽烈的独立摇滚"],
+  ["奇妙能力歌","陈粒","独立,民谣","空灵,自由,孤独","旅行,独自思考,文艺短片","爱情,自我,孤独","中文","2015","70-90","大调","2","人声+乐器","吉他,钢琴","单人","女","中音","空灵自由的独立民谣"],
+  ["岁月神偷","金玟岐","流行,抒情","温暖,感伤,怀念","时光流逝,家庭,回忆","时间,亲情,怀念","中文","2014","60-80","大调","2","人声+乐器","钢琴,吉他,弦乐","单人","女","中音","温暖感伤的时光情歌"],
+  ["追光者","岑宁儿","流行,抒情","温暖,坚定,治愈","励志,爱情,成长","爱情,梦想,坚持","中文","2017","70-90","大调","2","人声+乐器","钢琴,吉他,弦乐","单人","女","高音","温暖坚定的治愈情歌"],
+  ["大鱼","周深","流行,古风","空灵,深情,唯美","古风,唯美画面,离别","爱情,命运,守护","中文","2016","60-80","小调","2","人声+乐器","钢琴,弦乐,笛子,鼓","单人","男","高音","空灵唯美的古风情歌"],
+  ["天空之城","久石让","轻音乐,新世纪","空灵,忧伤,治愈","安静,回忆,治愈系","梦想,童年,离别","纯器乐","1986","60-80","小调","1","纯音乐","钢琴,弦乐","纯器乐","纯器乐","纯器乐","空灵治愈的钢琴曲"],
+  ["River Flows in You","Yiruma","轻音乐,钢琴","温柔,浪漫,宁静","婚礼,安静,浪漫","爱情,宁静,温柔","纯器乐","2001","60-80","大调","1","纯音乐","钢琴","纯器乐","纯器乐","纯器乐","温柔浪漫的钢琴曲"],
+  ["夜的钢琴曲五","石进","轻音乐,钢琴","安静,孤独,治愈","深夜,独处,安静","孤独,思念,宁静","纯器乐","2010","50-70","小调","1","纯音乐","钢琴","纯器乐","纯器乐","纯器乐","安静治愈的深夜钢琴曲"],
+  ["克罗地亚狂想曲","Maksim","古典,crossover","激昂,磅礴,悲壮","战争,史诗,高潮","战争,命运,抗争","纯器乐","2003","120-140","小调","5","纯音乐","钢琴,弦乐,鼓","纯器乐","纯器乐","纯器乐","激昂磅礴的钢琴狂想曲"]
+  ];
+  const K=["genre","mood","scene","theme","language","era","bpm","tonality","energy","arrangement","instrument","vocalCount","vocalGender","vocalRange","intro"];
+  const tracks=S.map(r=>{
+    const o={title:r[0],artist:r[1],enriched:true};
+    K.forEach((k,i)=>{o[k]=r[i+2]});
+    return o;
+  });
+  libs["示例曲库"]={tracks,createdAt:Date.now()};
+  cur="示例曲库";localStorage.setItem(LS_CUR,cur);saveLibs();
+  toast("已载入 20 首示例曲目（字段已解析，可直接搜索）");renderTabs();
+}
+
+/* ---------- table render ---------- */
+function renderTable(){
+  const tbody=$id("tbody");
+  if(!cur){tbody.innerHTML=`<tr><td colspan="18" class="empty">暂无数据 —— 点击上方「载入示例数据」体验，或上传你的 Excel 曲库</td></tr>`;return}
+  const tracks=libs[cur].tracks;
+  if(tracks.length===0){tbody.innerHTML=`<tr><td colspan="18" class="empty">当前曲库为空，请上传文件或载入示例数据</td></tr>`;return}
+  let h="";
+  tracks.forEach((t,i)=>{
+    const en=t.enriched;
+    h+=`<tr>
+      <td><b>${esc(t.title)}</b> ${en?`<span class="badge">已解析</span>`:`<span class="badge no">待解析</span>`}</td>
+      <td>${esc(t.artist)}</td>
+      <td contenteditable data-i="${i}" data-f="genre" title="可编辑">${esc(t.genre)}</td>
+      <td contenteditable data-i="${i}" data-f="mood">${esc(t.mood)}</td>
+      <td contenteditable data-i="${i}" data-f="scene">${esc(t.scene)}</td>
+      <td contenteditable data-i="${i}" data-f="theme">${esc(t.theme)}</td>
+      <td contenteditable data-i="${i}" data-f="language">${esc(t.language)}</td>
+      <td contenteditable data-i="${i}" data-f="era">${esc(t.era)}</td>
+      <td contenteditable data-i="${i}" data-f="bpm">${esc(t.bpm)}</td>
+      <td contenteditable data-i="${i}" data-f="tonality">${esc(t.tonality)}</td>
+      <td contenteditable data-i="${i}" data-f="energy">${esc(t.energy)}</td>
+      <td contenteditable data-i="${i}" data-f="arrangement">${esc(t.arrangement)}</td>
+      <td contenteditable data-i="${i}" data-f="instrument" style="max-width:150px">${esc(t.instrument)}</td>
+      <td contenteditable data-i="${i}" data-f="vocalCount">${esc(t.vocalCount)}</td>
+      <td contenteditable data-i="${i}" data-f="vocalGender">${esc(t.vocalGender)}</td>
+      <td contenteditable data-i="${i}" data-f="vocalRange">${esc(t.vocalRange)}</td>
+      <td contenteditable data-i="${i}" data-f="intro" style="max-width:180px">${esc(t.intro)}</td>
+      <td class="listen">${listenLinks(t)}</td>
+    </tr>`;
+  });
+  tbody.innerHTML=h;
+  probePlayable();
+  tbody.querySelectorAll("td[contenteditable]").forEach(td=>{
+    td.addEventListener("blur",()=>{
+      const i=+td.dataset.i,f=td.dataset.f;
+      if(cur&&libs[cur].tracks[i]){libs[cur].tracks[i][f]=td.textContent.trim();saveLibs()}
+    });
+  });
+}
+/* ---------- 可播性预检：把不能播的按钮置灰 ----------
+   判据来自服务端 fee 字段（实测 57 首 100% 一致）：
+   fee=0 / 8 可直链播放；fee=1 版权受限不可播；搜不到也不可播。       */
+const PLAY_KEY="mf_playable_v1";
+let PLAY_MAP={};
+try{PLAY_MAP=JSON.parse(localStorage.getItem(PLAY_KEY)||"{}")}catch(e){PLAY_MAP={}}
+function pkey(t,a){return `${(t||"").trim()}\t${(a||"").trim()}`}
+function savePlayMap(){try{localStorage.setItem(PLAY_KEY,JSON.stringify(PLAY_MAP))}catch(e){}}
+function applyPlayState(b,st){
+  b.dataset.done="1";
+  if(st.playable){
+    b.classList.remove("na","pending");b.disabled=false;b.textContent="▶ 播放";
+    b.title="在本页直接播放（已确认可播）";
+  }else{
+    b.classList.add("na");b.classList.remove("pending");b.disabled=true;b.textContent="▶ 不可播";
+    b.title=st.reason==="notfound"?"网易云未收录此曲，无法直接播放":"版权受限（VIP/独家版权），无法直接播放，可用右侧平台链接试听";
+  }
+}
+let probing=false;
+async function probePlayable(){
+  const btns=[...document.querySelectorAll(".play-btn")].filter(b=>b.dataset.done!=="1"&&b.dataset.q);
+  if(!btns.length)return;
+  // 先套用本地缓存
+  let pending=[];
+  btns.forEach(b=>{
+    const st=PLAY_MAP[b.dataset.q];
+    if(st)applyPlayState(b,st); else pending.push(b.dataset.q);
+  });
+  const uniq=[...new Set(pending)];
+  if(!uniq.length)return;
+  if(probing)return; probing=true;
+  try{
+    for(let i=0;i<uniq.length;i+=30){
+      const batch=uniq.slice(i,i+30);
+      try{
+        const r=await fetch("/api/playable?qs="+encodeURIComponent(batch.join(";;")));
+        const d=await r.json();
+        if(d.ok&&d.items){
+          d.items.forEach(it=>{PLAY_MAP[it.k||it.q]={playable:it.playable,reason:it.reason,fee:it.fee}});
+          savePlayMap();
+          document.querySelectorAll(".play-btn").forEach(b=>{
+            if(b.dataset.done!=="1"&&b.dataset.q&&PLAY_MAP[b.dataset.q])applyPlayState(b,PLAY_MAP[b.dataset.q]);
+          });
+        }
+      }catch(e){/* 本地打开无服务端：保持原样，不置灰 */}
+    }
+  }finally{probing=false}
+}
+function listenLinks(t){
+  const q=encodeURIComponent(`${t.title} ${t.artist}`.trim());
+  const k=pkey(t.title,t.artist);
+  const st=PLAY_MAP[k];
+  let cls="play-btn",txt="▶ 播放",tip="在本页直接播放",dis="";
+  if(st&&st.playable===false){
+    cls+=" na";txt="▶ 不可播";dis=" disabled";
+    tip=st.reason==="notfound"?"网易云未收录此曲，无法直接播放":"版权受限（VIP/独家版权），无法直接播放，可用右侧平台链接试听";
+  }else if(st&&st.playable===true){
+    cls+="";tip="在本页直接播放（已确认可播）";
+  }else{cls+=" pending";tip="正在检测能否播放…"}
+  return `<button class="${cls}"${dis} data-title="${esc(t.title)}" data-artist="${esc(t.artist)}" data-q="${esc(k)}" data-done="${st?"1":"0"}" title="${tip}">${txt}</button>
+<a target="_blank" rel="noopener" href="https://music.163.com/#/search/m/?s=${q}" title="网易云搜索试听">网易云</a>
+<a target="_blank" rel="noopener" href="https://y.qq.com/n/ryqq/search?w=${q}" title="QQ音乐搜索试听">QQ音乐</a>
+<a target="_blank" rel="noopener" href="https://search.bilibili.com/all?keyword=${q}" title="B站搜索试听">B站</a>`;
+}
+
+/* ---------- parse (batch LLM) ---------- */
+async function startParse(){
+  if(!cur){toast("请先上传曲库");return}
+  const tracks=libs[cur].tracks;
+  const todo=tracks.map((t,i)=>i).filter(i=>!tracks[i].enriched);
+  if(todo.length===0){toast("当前曲库已全部解析");return}
+  if(!cfg.key){toast("请先在「接口设置」中填入 API Key");return}
+  parsing=true;abortParse=false;
+  const btn=$id("btnParse");btn.disabled=true;btn.textContent="解析中…";
+  $id("prog").style.display="block";
+  const model=$id("parseModel").value;
+  let done=0,fail=0;
+  const BATCH=10,CONC=4;
+  const batches=[];
+  for(let k=0;k<todo.length;k+=BATCH)batches.push(todo.slice(k,k+BATCH));
+  try{
+    for(let g=0;g<batches.length;g+=CONC){
+      if(abortParse)break;
+      await Promise.all(batches.slice(g,g+CONC).map(async idxs=>{
+      if(abortParse)return;
+      const batch=idxs.map(i=>({title:tracks[i].title,artist:tracks[i].artist}));
+      const prompt=`你是音乐资料库管理员。下面是用户上传的曲目清单（JSON 数组），每项含 title（曲名）和 artist（歌手/演唱者）。请根据你对这些歌曲的了解，为每一项补齐音乐标签。严格按相同顺序返回 JSON 数组，每个元素包含：
+genre 曲风（1-3 个，英文逗号分隔，如"民谣,独立"）
+mood 情绪（1-3 个，英文逗号分隔，如"温暖,怀旧"）
+scene 适用场景标签（2-4 个，英文逗号分隔，如"公路旅行,片头,清晨"）
+theme 主题（1-3 个，英文逗号分隔，如"爱情,思乡"）
+language 语种（如"中文"）
+era 发行年代（如"1993"或"2010s"）
+bpm 节奏区间（如"70-90"或"中速"）
+tonality 调性（大调/小调/不确定）
+energy 能量值（1-5 整数）
+arrangement 编制（纯音乐/人声/人声+乐器）
+instrument 主要乐器（1-4 个，英文逗号分隔，如"吉他,口琴,鼓"；无人声纯器乐照实写乐器，纯人声无伴奏写"无伴奏"）
+vocalCount 歌手数量（单人/双人/三人及以上/纯器乐，四选一）
+vocalGender 歌手性别（男/女/男女对唱/组合/纯器乐，五选一）
+vocalRange 音域（高音/中音/低音/花腔/纯器乐，五选一）
+intro 一句话风格简介（15 字以内）
+若某首歌不熟悉，给出合理推断并在 intro 注明"推断"。多值字段一律用英文逗号分隔，不要使用顿号或斜杠。只输出 JSON，不要其他文字。
+曲目清单：${JSON.stringify(batch)}`;
+      let content=null;
+      try{content=await chat([{role:"user",content:prompt}],model,0.2)}catch(e){fail+=idxs.length;return}
+      let arr=[];
+      try{arr=parseJSON(content)}catch(e){fail+=idxs.length;return}
+      arr.forEach((item,j)=>{
+        const idx=idxs[j];if(idx==null||!tracks[idx])return;
+        for(const f of FIELDS){tracks[idx][f]=String(item?.[f]??"").trim()}
+        tracks[idx].enriched=true;
+      });
+      done+=Math.min(idxs.length,arr.length);
+      }));
+      updateProg(done,fail,todo.length);
+    }
+    saveLibs();
+    toast(abortParse?`已中止：完成 ${done}/${todo.length}`:`解析完成：成功 ${done}，失败 ${fail}`);
+  }catch(e){toast("解析出错："+e.message)}
+  parsing=false;abortParse=false;btn.disabled=false;btn.textContent="开始解析全部曲目";
+  $id("prog").style.display="none";renderTabs();
+}
+function updateProg(done,fail,total){
+  const p=Math.round((done+fail)/total*100);
+  $id("progBar").style.width=p+"%";
+  $id("progTxt").textContent=`进度 ${done+fail}/${total}（成功 ${done} · 失败 ${fail}）· 点击右上角接口设置旁的「导出 Excel」可随时保存`;
+}
+
+/* ---------- search ---------- */
+async function doSearch(){
+  if(!cur){toast("请先上传曲库");return}
+  const tracks=libs[cur].tracks.filter(t=>t.title);
+  if(tracks.length===0){toast("曲库为空");return}
+  const scene=$id("scene").value.trim();
+  if(!scene){toast("请描述场景需求");return}
+  if(!cfg.key){toast("请先在「接口设置」中填入 API Key");return}
+  const btn=$id("btnSearch");btn.disabled=true;btn.textContent="搜索中…";
+  const n=+$id("topN").value,model=$id("rankModel").value;
+  $id("results").innerHTML=`<div class="empty">正在匹配场景，请稍候…</div>`;
+  try{
+    const cand=prefilter(tracks,scene,60);
+    const list=cand.map(t=>({title:t.title,artist:t.artist,genre:t.genre,mood:t.mood,scene:t.scene,theme:t.theme,language:t.language,era:t.era,bpm:t.bpm,tonality:t.tonality,energy:t.energy,arrangement:t.arrangement,instrument:t.instrument,vocalCount:t.vocalCount,vocalGender:t.vocalGender,vocalRange:t.vocalRange,intro:t.intro}));
+    const prompt=`你是影视/视频配乐选曲顾问。以下是从曲库中筛选出的候选歌曲（JSON 数组，字段：曲名/歌手/曲风/情绪/场景/主题/语种/年代/BPM/调性/能量/编制/主要乐器/歌手数量/歌手性别/音域/简介）。请根据创作需求："${scene}"，挑选最合适的 ${n} 首歌。
+特别注意需求中的硬性限定：如"纯音乐""无人声"则排除 vocalCount/vocalGender/vocalRange 非"纯器乐"的曲目；如指定乐器（如"钢琴为主"）需匹配 instrument；如指定人声特征（如"女声""高音""对唱"）需匹配 vocalGender/vocalRange/vocalCount；如涉及内容主题（如"思乡""励志"）需匹配 theme。
+严格返回 JSON 数组（按匹配度从高到低），每项含：
+title 曲名（必须与候选中完全一致）
+artist 歌手
+score 匹配分（0-100）
+reason 推荐理由（40 字以内，说明与场景的契合点）
+如果候选中没有合适的歌，返回空数组。只输出 JSON，不要其他文字。
+候选歌曲：${JSON.stringify(list)}`;
+    const content=await chat([{role:"user",content:prompt}],model,0.4);
+    let picks=[];
+    try{picks=parseJSON(content)}catch(e){throw new Error("搜索结果解析失败："+e.message)}
+    const byTitle={};cand.forEach(t=>byTitle[t.title+"|"+t.artist]=t);
+    if(picks.length===0){$id("results").innerHTML=`<div class="empty">没有找到匹配的歌曲，可尝试换一种描述或扩大候选范围</div>`;return}
+    let h="";
+    picks.slice(0,n).forEach((p,i)=>{
+      const t=byTitle[p.title+"|"+p.artist]||byTitle[p.title+"|"]||cand.find(c=>c.title===p.title);
+      if(!t)return;
+      h+=`<div class="result-card">
+        <div class="top"><span class="rank">#${i+1}</span><span class="t">${esc(t.title)}</span><span class="a">${esc(t.artist)}</span>
+        <span class="a">匹配 ${p.score??"-"}</span></div>
+        <div class="tags">${tagsHtml(t)}</div>
+        <div class="reason">${esc(p.reason||"")}</div>
+        <div class="listen" style="margin-top:8px">${listenLinks(t)}</div>
+      </div>`;
+    });
+    $id("results").innerHTML=h||`<div class="empty">候选中未找到完全匹配项</div>`;
+    probePlayable();
+  }catch(e){$id("results").innerHTML=`<div class="empty" style="color:var(--err)">搜索失败：${esc(e.message)}</div>`}
+  btn.disabled=false;btn.textContent="开始搜索";
+}
+function tagsHtml(t){
+  const parts=[t.genre,t.mood,t.scene,t.theme&&("主题:"+t.theme),t.language&&("语种:"+t.language),t.era&&("年代:"+t.era),t.bpm&&("BPM:"+t.bpm),t.tonality&&("调性:"+t.tonality),t.energy&&("能量:"+t.energy),t.arrangement&&("编制:"+t.arrangement),t.instrument&&("乐器:"+t.instrument),t.vocalGender&&("人声:"+t.vocalGender+(t.vocalCount?"/"+t.vocalCount:"")),t.vocalRange&&("音域:"+t.vocalRange),t.intro&&("简介:"+t.intro)];
+  return parts.filter(Boolean).map(x=>`<span class="tag">${esc(x)}</span>`).join("");
+}
+function prefilter(tracks,scene,limit){
+  const words=[...scene.match(/[\u4e00-\u9fa5]{2,4}/g)||[],...(scene.match(/[a-zA-Z]+/g)||[]).map(w=>w.toLowerCase())];
+  const scored=tracks.map(t=>{
+    let s=0;
+    const isInst=[t.vocalCount,t.vocalGender,t.vocalRange].includes("纯器乐");
+    const blob=[t.genre,t.mood,t.scene,t.theme,t.arrangement,t.instrument,t.vocalCount,t.vocalGender,t.vocalRange,t.intro,t.title,t.artist,isInst?"纯音乐 无人声 器乐 instrumental":""].join(" ").toLowerCase();
+    for(const w of words){if(blob.includes(w))s++}
+    return {t,s};
+  }).sort((a,b)=>b.s-a.s);
+  const top=scored.filter(x=>x.s>0).map(x=>x.t);
+  const rest=scored.filter(x=>x.s===0).map(x=>x.t);
+  return [...top,...rest].slice(0,Math.max(limit,top.length||limit));
+}
+
+/* ---------- export ---------- */
+function exportXlsx(){
+  if(!cur||libs[cur].tracks.length===0){toast("没有可导出的数据");return}
+  const rows=libs[cur].tracks.map(t=>({"曲名":t.title,"歌手":t.artist,"曲风":t.genre,"情绪":t.mood,"场景":t.scene,"主题":t.theme,"语种":t.language,"年代":t.era,"BPM":t.bpm,"调性":t.tonality,"能量":t.energy,"编制":t.arrangement,"主要乐器":t.instrument,"歌手数量":t.vocalCount,"歌手性别":t.vocalGender,"音域":t.vocalRange,"简介":t.intro,"已解析":t.enriched?"是":"否"}));
+  const ws=XLSX.utils.json_to_sheet(rows);
+  const wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"曲库");
+  XLSX.writeFile(wb,`寻乐_${cur}_${new Date().toISOString().slice(0,10)}.xlsx`);
+  toast("已导出 Excel");
+}
+
+/* ---------- 播放（网易云免授权源，服务端代理） ---------- */
+let playToken=0;
+function findTrack(title,artist){
+  return ((libs[cur]&&libs[cur].tracks)||[]).find(t=>t.title===title&&t.artist===artist);
+}
+async function playTrack(title,artist,btn){
+  const A=$id("pbAudio"),F=$id("pbFrame");
+  // 1) 优先用曲库里自带的音频直链（公司素材库 / 网盘直链 / 本地文件地址）
+  const tk=findTrack(title,artist);
+  if(tk&&tk.audio){playDirect(tk.audio,`${title} · ${artist}`,"自定义音频源",tk);return}
+  $id("playbar").classList.add("show");
+  const my=++playToken;
+  A.onerror=null;A.pause();A.removeAttribute("src");A.style.display="none";
+  F.src="about:blank";F.style.display="none";
+  $id("pbCover").removeAttribute("src");
+  $id("pbName").textContent=title||"—";
+  $id("pbSub").textContent=artist?`正在找「${artist}」的可播放源…`:"正在找可播放源…";
+  $id("pbTip").textContent="";
+  if(btn){btn.disabled=true;btn.textContent="载入中"}
+  try{
+    const url="/api/play?q="+encodeURIComponent(`${title} ${artist}`.trim())
+      +"&title="+encodeURIComponent(title||"")+"&artist="+encodeURIComponent(artist||"");
+    const r=await fetch(url);
+    if(!r.ok)throw new Error("HTTP "+r.status);
+    const d=await r.json();
+    if(my!==playToken)return;
+    if(!d.ok){
+      $id("pbSub").textContent=d.error||"没找到可播放源";
+      $id("pbTip").innerHTML=`可用右侧平台链接搜索试听${setAudioBtn(title,artist)}`;
+      return;
+    }
+    if(d.playable===false){
+      $id("pbName").textContent=`${d.name||title} · ${d.artist||artist}`;
+      $id("pbSub").textContent=d.reason==="notfound"?"网易云未收录此曲":"版权受限（VIP / 独家版权），无法直接播放";
+      $id("pbTip").innerHTML=`可用右侧平台链接搜索试听${setAudioBtn(d.name||title,d.artist||artist)}`;
+      return;
+    }
+    if(d.pic)$id("pbCover").src=d.pic;
+    $id("pbName").textContent=`${d.name} · ${d.artist}`;
+    $id("pbSub").innerHTML=`${esc(d.album||"")} · 来源 ${esc(d.source)} · <a target="_blank" rel="noopener" href="${d.page}">打开歌曲页</a>`;
+    if(d.mp3){
+      A.style.display="block";
+      A.onerror=()=>{A.style.display="none";useEmbed(d)};
+      A.src=d.mp3;
+      try{await A.play()}catch(e){$id("pbTip").textContent="浏览器拦截了自动播放，点一下播放键即可"}
+    }else{useEmbed(d)}
+  }catch(e){
+    if(my!==playToken)return;
+    $id("pbSub").textContent="播放服务不可用："+e.message;
+    $id("pbTip").textContent="直接用本地文件打开时没有服务端，需通过已部署的站点访问";
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent="▶ 播放"}
+  }
+}
+function useEmbed(d){
+  const F=$id("pbFrame");
+  F.style.display="block";
+  F.src=d.embed;
+  $id("pbTip").innerHTML=`官方播放器兜底中${setAudioBtn(d.name,d.artist)}`;
+}
+async function playDirect(src,name,source,tk){
+  const A=$id("pbAudio"),F=$id("pbFrame");
+  $id("playbar").classList.add("show");
+  ++playToken;
+  A.onerror=null;A.pause();A.removeAttribute("src");A.style.display="none";
+  F.src="about:blank";F.style.display="none";
+  $id("pbCover").removeAttribute("src");
+  $id("pbName").textContent=name;
+  $id("pbSub").textContent="来源 "+source;
+  $id("pbTip").textContent="";
+  A.style.display="block";
+  A.onerror=()=>{$id("pbTip").textContent="音频无法播放，请检查链接是否可直连（需返回音频文件本身）"};
+  A.src=src;
+  try{await A.play()}catch(e){$id("pbTip").textContent="浏览器拦截了自动播放，点一下播放键即可"}
+}
+function setAudioBtn(title,artist){
+  return ` · <button class="set-audio" data-title="${esc(title)}" data-artist="${esc(artist)}">设置音频链接</button>`;
+}
+function setAudioLink(title,artist){
+  const u=prompt(`为《${title}》设置音频直链（mp3/m4a/wav 等可直连地址，如公司素材库 / 对象存储 / 网盘直链）：`,"");
+  if(!u||!u.trim())return;
+  const tk=findTrack(title,artist);
+  if(!tk){toast("当前曲库里没找到这首，无法保存链接");return}
+  tk.audio=u.trim();saveLibs();
+  toast("已保存，正在播放");
+  playTrack(title,artist,null);
+}
+function closePlay(){
+  const A=$id("pbAudio"),F=$id("pbFrame");
+  A.onerror=null;
+  try{A.pause()}catch(e){}
+  A.removeAttribute("src");A.style.display="none";
+  F.src="about:blank";F.style.display="none";
+  $id("playbar").classList.remove("show");
+  playToken++;
+}
+
+/* ---------- init ---------- */
+$id("drop").addEventListener("click",()=>$id("file").click());
+$id("drop").addEventListener("dragover",e=>{e.preventDefault();$id("drop").classList.add("drag")});
+$id("drop").addEventListener("dragleave",()=>$id("drop").classList.remove("drag"));
+$id("drop").addEventListener("drop",e=>{e.preventDefault();$id("drop").classList.remove("drag");handleFile(e.dataTransfer.files[0])});
+$id("file").addEventListener("change",e=>{handleFile(e.target.files[0]);e.target.value=""});
+$id("pbClose").addEventListener("click",closePlay);
+document.addEventListener("click",e=>{
+  const b=e.target.closest(".play-btn");
+  if(b){if(b.classList.contains("na")){toast("该曲版权受限，无法直接播放");return}playTrack(b.dataset.title,b.dataset.artist,b);return}
+  const s=e.target.closest(".set-audio");
+  if(s){setAudioLink(s.dataset.title,s.dataset.artist)}
+});
+loadLibs();fillModelSelects();renderTabs();
+</script>
+</body>
+</html>
