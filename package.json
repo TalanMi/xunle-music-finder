@@ -1,0 +1,12 @@
+{
+  "name": "xunle-music-finder",
+  "version": "0.2.0",
+  "private": true,
+  "description": "寻乐 · 音乐检索平台 —— 上传曲目表或粘贴腾讯文档链接，AI 补全字段并按场景找歌",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=16"
+  }
+}
